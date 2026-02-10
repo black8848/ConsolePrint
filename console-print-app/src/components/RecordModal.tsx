@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import type { ConsoleRecord, LogStatus } from '../types';
-import { STATUS_CONFIG, STATUS_OPTIONS } from '../utils/statusConfig';
+import { X, Wand2 } from 'lucide-react';
+import type { ConsoleRecord } from '../types';
 import { generateId } from '../utils/storage';
+import { parseConsoleContent } from '../utils/parseConsole';
 
 interface RecordModalProps {
   isOpen: boolean;
@@ -12,37 +12,67 @@ interface RecordModalProps {
 }
 
 export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProps) {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [status, setStatus] = useState<LogStatus>('info');
+  const [rawInput, setRawInput] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [command, setCommand] = useState('');
+  const [output, setOutput] = useState('');
+  const [note, setNote] = useState('');
+  const [mode, setMode] = useState<'paste' | 'manual'>('paste');
 
   useEffect(() => {
     if (record) {
-      setTitle(record.title);
-      setContent(record.content);
-      setStatus(record.status);
+      setMode('manual');
+      setPrompt(record.prompt);
+      setCommand(record.command);
+      setOutput(record.output);
+      setNote(record.note || '');
+      setRawInput('');
     } else {
-      setTitle('');
-      setContent('');
-      setStatus('info');
+      setMode('paste');
+      setPrompt('');
+      setCommand('');
+      setOutput('');
+      setNote('');
+      setRawInput('');
     }
   }, [record, isOpen]);
 
+  const handleParse = () => {
+    const parsed = parseConsoleContent(rawInput);
+    setPrompt(parsed.prompt);
+    setCommand(parsed.command);
+    setOutput(parsed.output);
+    setMode('manual');
+  };
+
+  const handleRawInputChange = (value: string) => {
+    setRawInput(value);
+    // 自动解析
+    if (value.trim()) {
+      const parsed = parseConsoleContent(value);
+      setPrompt(parsed.prompt);
+      setCommand(parsed.command);
+      setOutput(parsed.output);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
 
     const now = Date.now();
     onSave({
       id: record?.id || generateId(),
-      title: title.trim(),
-      content,
-      status,
+      prompt: prompt.trim(),
+      command: command.trim(),
+      output,
+      note: note.trim() || undefined,
       timestamp: now,
       createdAt: record?.createdAt || now,
     });
     onClose();
   };
+
+  const canSubmit = command.trim() || output.trim();
 
   if (!isOpen) return null;
 
@@ -55,13 +85,7 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
       />
 
       {/* Modal */}
-      <div
-        className="
-          relative w-full max-w-lg bg-white rounded-2xl shadow-xl
-          border border-stone-200/60
-          animate-in fade-in zoom-in-95 duration-200
-        "
-      >
+      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-stone-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
           <h2 className="text-lg font-semibold text-stone-800">
@@ -69,10 +93,7 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
           </h2>
           <button
             onClick={onClose}
-            className="
-              p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100
-              transition-colors duration-150 cursor-pointer
-            "
+            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -80,96 +101,136 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1.5">
-              标题
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="如: 登录API错误, 数据库连接失败..."
-              className="
-                w-full px-3.5 py-2.5 rounded-lg border border-stone-200
-                text-stone-800 placeholder:text-stone-400
-                focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                transition-colors duration-150
-              "
-              autoFocus
-            />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1.5">
-              状态
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((s) => {
-                const config = STATUS_CONFIG[s];
-                const isSelected = status === s;
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStatus(s)}
-                    className={`
-                      px-3 py-1.5 rounded-lg text-sm font-medium
-                      border transition-all duration-150 cursor-pointer
-                      ${isSelected
-                        ? `${config.bgColor} ${config.textColor} ${config.borderColor}`
-                        : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300'
-                      }
-                    `}
-                  >
-                    {config.label}
-                  </button>
-                );
-              })}
+          {/* Mode Toggle */}
+          {!record && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMode('paste')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                  mode === 'paste'
+                    ? 'bg-stone-800 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                粘贴解析
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('manual')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                  mode === 'manual'
+                    ? 'bg-stone-800 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                手动填写
+              </button>
             </div>
-          </div>
+          )}
 
-          {/* Content */}
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1.5">
-              控制台输出
-            </label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="粘贴控制台输出内容..."
-              rows={8}
-              className="
-                w-full px-3.5 py-2.5 rounded-lg border border-stone-200
-                font-mono text-sm text-stone-700 placeholder:text-stone-400
-                focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                transition-colors duration-150 resize-none
-                bg-stone-50/50
-              "
-            />
-          </div>
+          {/* Paste Mode */}
+          {mode === 'paste' && !record && (
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                粘贴控制台内容
+              </label>
+              <textarea
+                value={rawInput}
+                onChange={(e) => handleRawInputChange(e.target.value)}
+                placeholder={'粘贴完整的控制台内容，会自动解析...\n\n例如:\nuser@server:~$ npm run build\n[ERROR] Module not found...'}
+                rows={8}
+                className="w-full px-3.5 py-3 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors resize-none"
+                autoFocus
+              />
+              {rawInput.trim() && (
+                <button
+                  type="button"
+                  onClick={handleParse}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  <Wand2 size={14} />
+                  确认解析结果
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Manual Mode / Preview */}
+          {(mode === 'manual' || record) && (
+            <>
+              {/* Prompt & Command */}
+              <div className="flex gap-3">
+                <div className="w-2/5">
+                  <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                    Prompt <span className="text-stone-400 font-normal">(可选)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="user@host:~$"
+                    className="w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-emerald-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                    命令 <span className="text-stone-400 font-normal">(可选)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={command}
+                    onChange={(e) => setCommand(e.target.value)}
+                    placeholder="npm run build"
+                    className="w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors"
+                    autoFocus={mode === 'manual'}
+                  />
+                </div>
+              </div>
+
+              {/* Output */}
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                  输出内容
+                </label>
+                <textarea
+                  value={output}
+                  onChange={(e) => setOutput(e.target.value)}
+                  placeholder="控制台输出..."
+                  rows={8}
+                  className="w-full px-3.5 py-3 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors resize-none"
+                />
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                  注释 <span className="text-stone-400 font-normal">(可选)</span>
+                </label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="添加备注说明..."
+                  className="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors"
+                />
+              </div>
+            </>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="
-                px-4 py-2 rounded-lg text-stone-600 font-medium
-                hover:bg-stone-100 transition-colors duration-150 cursor-pointer
-              "
+              className="px-4 py-2 rounded-lg text-stone-600 font-medium hover:bg-stone-100 transition-colors cursor-pointer"
             >
               取消
             </button>
             <button
               type="submit"
-              disabled={!title.trim()}
-              className="
-                px-5 py-2 rounded-lg bg-stone-800 text-white font-medium
-                hover:bg-stone-700 transition-colors duration-150
-                disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer
-              "
+              disabled={!canSubmit}
+              className="px-5 py-2 rounded-lg bg-stone-800 text-white font-medium hover:bg-stone-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {record ? '保存' : '添加'}
             </button>

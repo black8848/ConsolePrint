@@ -1,10 +1,9 @@
-export type LogStatus = 'error' | 'warning' | 'info' | 'resolved';
-
 export interface ConsoleRecord {
   id: string;
-  title: string;
-  content: string;
-  status: LogStatus;
+  prompt: string;      // user@hostname:path$
+  command: string;     // 执行的命令
+  output: string;      // 输出内容
+  note?: string;       // 可选注释
   timestamp: number;
   createdAt: number;
 }

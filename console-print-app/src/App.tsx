@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
-import { ConsoleCard } from './components/ConsoleCard';
+import { TerminalBlock } from './components/TerminalBlock';
 import { RecordModal } from './components/RecordModal';
 import { EmptyState } from './components/EmptyState';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -65,20 +65,20 @@ function App() {
   const sortedRecords = [...records].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <div className="min-h-screen bg-[#f8f7f4]">
+    <div className="min-h-screen bg-[#f5f5f0]">
       <Header
         recordCount={records.length}
         onAdd={handleAdd}
         onClearAll={handleClearRequest}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-6 py-8">
         {records.length === 0 ? (
           <EmptyState onAdd={handleAdd} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="space-y-6">
             {sortedRecords.map((record) => (
-              <ConsoleCard
+              <TerminalBlock
                 key={record.id}
                 record={record}
                 onEdit={handleEdit}
@@ -101,8 +101,8 @@ function App() {
         title={confirmDialog.type === 'clear' ? '清空所有记录' : '删除记录'}
         message={
           confirmDialog.type === 'clear'
-            ? '确定要删除所有记录吗? 此操作不可撤销。'
-            : '确定要删除这条记录吗?'
+            ? '确定要删除所有记录吗？此操作不可撤销。'
+            : '确定要删除这条记录吗？'
         }
         confirmLabel={confirmDialog.type === 'clear' ? '清空' : '删除'}
         onConfirm={handleConfirm}
