@@ -1,24 +1,35 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { domToPng } from 'modern-screenshot';
 import { Header } from './components/Header';
 import { TerminalBlock } from './components/TerminalBlock';
 import { RecordModal } from './components/RecordModal';
 import { EmptyState } from './components/EmptyState';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import type { ConsoleRecord } from './types';
-import { loadRecords, saveRecords } from './utils/storage';
+import {
+  loadRecords,
+  saveRecords,
+  bindLocalFile,
+  createLocalFile,
+  getBoundFileName,
+  unbindFile,
+} from './utils/storage';
 
 function App() {
   const [records, setRecords] = useState<ConsoleRecord[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<ConsoleRecord | null>(null);
+  const [boundFileName, setBoundFileName] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     type: 'delete' | 'clear';
     targetId?: string;
   }>({ isOpen: false, type: 'delete' });
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setRecords(loadRecords());
+    setBoundFileName(getBoundFileName());
   }, []);
 
   useEffect(() => {
@@ -62,21 +73,86 @@ function App() {
     setConfirmDialog({ isOpen: false, type: 'delete' });
   }, [confirmDialog]);
 
+  const handleExport = useCallback(() => {
+    const data = JSON.stringify(records, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `console-print-${new Date().toISOString().slice(0, 10)}.json`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [records]);
+
+  const handleImport = useCallback((imported: ConsoleRecord[]) => {
+    setRecords((prev) => {
+      const existingIds = new Set(prev.map((r) => r.id));
+      const newRecords = imported.filter((r) => !existingIds.has(r.id));
+      return [...newRecords, ...prev];
+    });
+  }, []);
+
+  const handleScreenshotAll = useCallback(async () => {
+    if (!contentRef.current || records.length === 0) return;
+
+    try {
+      const dataUrl = await domToPng(contentRef.current, {
+        scale: 2,
+        backgroundColor: '#f5f5f0',
+      });
+
+      const link = document.createElement('a');
+      link.download = `console-all-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Screenshot failed:', error);
+      alert('截图失败，请重试');
+    }
+  }, [records.length]);
+
+  const handleBindFile = useCallback(async () => {
+    const loaded = await bindLocalFile();
+    if (loaded) {
+      setRecords(loaded);
+      setBoundFileName(getBoundFileName());
+    }
+  }, []);
+
+  const handleCreateFile = useCallback(async () => {
+    const success = await createLocalFile(records);
+    if (success) {
+      setBoundFileName(getBoundFileName());
+    }
+  }, [records]);
+
+  const handleUnbindFile = useCallback(() => {
+    unbindFile();
+    setBoundFileName(null);
+  }, []);
+
   const sortedRecords = [...records].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
     <div className="min-h-screen bg-[#f5f5f0]">
       <Header
         recordCount={records.length}
+        boundFileName={boundFileName}
         onAdd={handleAdd}
         onClearAll={handleClearRequest}
+        onExport={handleExport}
+        onImport={handleImport}
+        onScreenshotAll={handleScreenshotAll}
+        onBindFile={handleBindFile}
+        onCreateFile={handleCreateFile}
+        onUnbindFile={handleUnbindFile}
       />
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         {records.length === 0 ? (
           <EmptyState onAdd={handleAdd} />
         ) : (
-          <div className="space-y-6">
+          <div ref={contentRef} className="space-y-6">
             {sortedRecords.map((record) => (
               <TerminalBlock
                 key={record.id}

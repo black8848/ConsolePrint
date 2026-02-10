@@ -7,26 +7,32 @@ export interface ParsedConsole {
 // 常见的 shell prompt 模式
 const PROMPT_PATTERNS = [
   // user@host:path$ command
-  /^([\w-]+@[\w.-]+:[~\/][\w\/.-]*[#$%>])\s*(.*)$/,
+  /^([\w-]+@[\w.-]+:[~\/][\w\/.-]*[#$%>])\s*/,
   // user@host$ command
-  /^([\w-]+@[\w.-]+[#$%>])\s*(.*)$/,
+  /^([\w-]+@[\w.-]+[#$%>])\s*/,
   // [user@host path]$ command
-  /^(\[[\w-]+@[\w.-]+\s+[~\/]?[\w\/.-]*\][#$%>]?)\s*(.*)$/,
+  /^(\[[\w-]+@[\w.-]+\s+[~\/]?[\w\/.-]*\][#$%>]?)\s*/,
   // host:path$ command
-  /^([\w.-]+:[~\/][\w\/.-]*[#$%>])\s*(.*)$/,
+  /^([\w.-]+:[~\/][\w\/.-]*[#$%>])\s*/,
   // PS C:\path> command (PowerShell)
-  /^(PS\s+[A-Z]:\\[\w\\.-]*>)\s*(.*)$/i,
+  /^(PS\s+[A-Z]:\\[\w\\.-]*>)\s*/i,
   // C:\path> command (CMD)
-  /^([A-Z]:\\[\w\\.-]*>)\s*(.*)$/i,
+  /^([A-Z]:\\[\w\\.-]*>)\s*/i,
   // $ command or # command (simple)
-  /^([#$%>])\s*(.*)$/,
+  /^([#$%>])\s*/,
   // >>> command (Python REPL)
-  /^(>>>)\s*(.*)$/,
+  /^(>>>)\s*/,
   // mysql> command
-  /^(mysql>)\s*(.*)$/i,
+  /^(mysql>)\s*/i,
   // redis> command
-  /^([\w-]+>)\s*(.*)$/,
+  /^([\w-]+>)\s*/,
 ];
+
+// 检测是否是续行（多行命令的一部分）
+function isContinuationLine(line: string): boolean {
+  // 以 > 开头（PS continuation）、以空格/tab开头、或者上一行以 \ 结尾
+  return /^>\s/.test(line) || /^\s+/.test(line);
+}
 
 export function parseConsoleContent(content: string): ParsedConsole {
   const trimmed = content.trim();
@@ -41,10 +47,28 @@ export function parseConsoleContent(content: string): ParsedConsole {
   for (const pattern of PROMPT_PATTERNS) {
     const match = firstLine.match(pattern);
     if (match) {
+      const prompt = match[1];
+      const restOfFirstLine = firstLine.slice(match[0].length);
+
+      // 收集多行命令
+      const commandLines: string[] = [restOfFirstLine];
+      let outputStartIndex = 1;
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        // 检查是否是续行或者以 \ 结尾的上一行
+        if (isContinuationLine(line) || commandLines[commandLines.length - 1].endsWith('\\')) {
+          commandLines.push(line);
+          outputStartIndex = i + 1;
+        } else {
+          break;
+        }
+      }
+
       return {
-        prompt: match[1],
-        command: match[2] || '',
-        output: lines.slice(1).join('\n'),
+        prompt,
+        command: commandLines.join('\n'),
+        output: lines.slice(outputStartIndex).join('\n'),
       };
     }
   }

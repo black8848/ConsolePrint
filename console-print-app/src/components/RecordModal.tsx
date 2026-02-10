@@ -47,7 +47,6 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
 
   const handleRawInputChange = (value: string) => {
     setRawInput(value);
-    // 自动解析
     if (value.trim()) {
       const parsed = parseConsoleContent(value);
       setPrompt(parsed.prompt);
@@ -78,16 +77,13 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-stone-900/20 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-stone-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-stone-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100 sticky top-0 bg-white">
           <h2 className="text-lg font-semibold text-stone-800">
             {record ? '编辑记录' : '添加记录'}
           </h2>
@@ -99,9 +95,7 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Mode Toggle */}
           {!record && (
             <div className="flex gap-2">
               <button
@@ -129,7 +123,6 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
             </div>
           )}
 
-          {/* Paste Mode */}
           {mode === 'paste' && !record && (
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
@@ -138,8 +131,8 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
               <textarea
                 value={rawInput}
                 onChange={(e) => handleRawInputChange(e.target.value)}
-                placeholder={'粘贴完整的控制台内容，会自动解析...\n\n例如:\nuser@server:~$ npm run build\n[ERROR] Module not found...'}
-                rows={8}
+                placeholder={'粘贴完整的控制台内容，会自动解析...\n\n例如:\nuser@server:~$ docker run -it \\\n  --name test \\\n  ubuntu:latest\n[ERROR] Container failed...'}
+                rows={10}
                 className="w-full px-3.5 py-3 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors resize-none"
                 autoFocus
               />
@@ -156,39 +149,35 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
             </div>
           )}
 
-          {/* Manual Mode / Preview */}
           {(mode === 'manual' || record) && (
             <>
-              {/* Prompt & Command */}
-              <div className="flex gap-3">
-                <div className="w-2/5">
-                  <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                    Prompt <span className="text-stone-400 font-normal">(可选)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="user@host:~$"
-                    className="w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-emerald-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                    命令 <span className="text-stone-400 font-normal">(可选)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={command}
-                    onChange={(e) => setCommand(e.target.value)}
-                    placeholder="npm run build"
-                    className="w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors"
-                    autoFocus={mode === 'manual'}
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                  Prompt <span className="text-stone-400 font-normal">(可选)</span>
+                </label>
+                <input
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="user@host:~$"
+                  className="w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-emerald-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors"
+                />
               </div>
 
-              {/* Output */}
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                  命令 <span className="text-stone-400 font-normal">(支持多行)</span>
+                </label>
+                <textarea
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  placeholder={'npm run build\n# 或多行命令:\ndocker run -it \\\n  --name test \\\n  ubuntu:latest'}
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors resize-none"
+                  autoFocus={mode === 'manual'}
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1.5">
                   输出内容
@@ -202,7 +191,6 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
                 />
               </div>
 
-              {/* Note */}
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1.5">
                   注释 <span className="text-stone-400 font-normal">(可选)</span>
@@ -218,7 +206,6 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
             </>
           )}
 
-          {/* Actions */}
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
