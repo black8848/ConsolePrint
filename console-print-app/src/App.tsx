@@ -16,24 +16,24 @@ import {
 } from './utils/storage';
 
 function App() {
-  const [records, setRecords] = useState<ConsoleRecord[]>([]);
+  const [records, setRecords] = useState<ConsoleRecord[]>(() => loadRecords());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<ConsoleRecord | null>(null);
-  const [boundFileName, setBoundFileName] = useState<string | null>(null);
+  const [boundFileName, setBoundFileName] = useState<string | null>(() => getBoundFileName());
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     type: 'delete' | 'clear';
     targetId?: string;
   }>({ isOpen: false, type: 'delete' });
   const contentRef = useRef<HTMLDivElement>(null);
+  const isInitialized = useRef(false);
 
   useEffect(() => {
-    setRecords(loadRecords());
-    setBoundFileName(getBoundFileName());
-  }, []);
-
-  useEffect(() => {
-    saveRecords(records);
+    if (isInitialized.current) {
+      saveRecords(records);
+    } else {
+      isInitialized.current = true;
+    }
   }, [records]);
 
   const handleAdd = useCallback(() => {

@@ -124,29 +124,44 @@ export function RecordModal({ isOpen, record, onClose, onSave }: RecordModalProp
           )}
 
           {mode === 'paste' && !record && (
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                粘贴控制台内容
-              </label>
-              <textarea
-                value={rawInput}
-                onChange={(e) => handleRawInputChange(e.target.value)}
-                placeholder={'粘贴完整的控制台内容，会自动解析...\n\n例如:\nuser@server:~$ docker run -it \\\n  --name test \\\n  ubuntu:latest\n[ERROR] Container failed...'}
-                rows={10}
-                className="w-full px-3.5 py-3 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors resize-none"
-                autoFocus
-              />
-              {rawInput.trim() && (
-                <button
-                  type="button"
-                  onClick={handleParse}
-                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors cursor-pointer"
-                >
-                  <Wand2 size={14} />
-                  确认解析结果
-                </button>
-              )}
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                  粘贴控制台内容
+                </label>
+                <textarea
+                  value={rawInput}
+                  onChange={(e) => handleRawInputChange(e.target.value)}
+                  placeholder={'粘贴完整的控制台内容，会自动解析...\n\n例如:\nuser@server:~$ docker run -it \\\n  --name test \\\n  ubuntu:latest\n[ERROR] Container failed...'}
+                  rows={10}
+                  className="w-full px-3.5 py-3 rounded-lg border border-stone-200 bg-stone-50 font-mono text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors resize-none"
+                  autoFocus
+                />
+                {rawInput.trim() && (
+                  <button
+                    type="button"
+                    onClick={handleParse}
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors cursor-pointer"
+                  >
+                    <Wand2 size={14} />
+                    确认解析结果
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                  注释 <span className="text-stone-400 font-normal">(可选)</span>
+                </label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="添加备注说明..."
+                  className="w-full px-3 py-2.5 rounded-lg border border-stone-200 text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-colors"
+                />
+              </div>
+            </>
           )}
 
           {(mode === 'manual' || record) && (
