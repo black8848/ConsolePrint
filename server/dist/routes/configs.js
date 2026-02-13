@@ -8,15 +8,15 @@ router.get('/issue/:issueId', (req, res) => {
 });
 // Create config
 router.post('/', (req, res) => {
-    const { issueId, filePath, content, note } = req.body;
-    const { lastId } = run('INSERT INTO configs (issueId, filePath, content, note) VALUES (?, ?, ?, ?)', [issueId, filePath, content || '', note || null]);
+    const { issueId, filePath, content, language, note } = req.body;
+    const { lastId } = run('INSERT INTO configs (issueId, filePath, content, language, note) VALUES (?, ?, ?, ?, ?)', [issueId, filePath, content || '', language || 'text', note || null]);
     const config = queryOne('SELECT * FROM configs WHERE id = ?', [lastId]);
     res.status(201).json(config);
 });
 // Update config
 router.put('/:id', (req, res) => {
-    const { filePath, content, note } = req.body;
-    run('UPDATE configs SET filePath = ?, content = ?, note = ? WHERE id = ?', [filePath, content || '', note || null, req.params.id]);
+    const { filePath, content, language, note } = req.body;
+    run('UPDATE configs SET filePath = ?, content = ?, language = ?, note = ? WHERE id = ?', [filePath, content || '', language || 'text', note || null, req.params.id]);
     const config = queryOne('SELECT * FROM configs WHERE id = ?', [req.params.id]);
     res.json(config);
 });

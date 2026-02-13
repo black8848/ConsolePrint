@@ -39,6 +39,7 @@ export async function initDb() {
       issueId INTEGER NOT NULL,
       filePath TEXT NOT NULL,
       content TEXT DEFAULT '',
+      language TEXT DEFAULT 'text',
       note TEXT,
       createdAt TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (issueId) REFERENCES issues(id) ON DELETE CASCADE

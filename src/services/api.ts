@@ -16,6 +16,7 @@ export interface Config {
   issueId: number;
   filePath: string;
   content: string;
+  language: string;
   note: string | null;
   createdAt: string;
 }

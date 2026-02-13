@@ -11,6 +11,7 @@ import {
 } from '../services/api';
 import { parseConsoleContent } from '../utils/parseConsole';
 import { getLogColors } from '../utils/logColors';
+import { CodeBlock, SUPPORTED_LANGUAGES, detectLanguageFromPath } from '../components/CodeBlock';
 
 export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,7 +30,7 @@ export function IssueDetailPage() {
   const [showConfigForm, setShowConfigForm] = useState(false);
   const [configMode, setConfigMode] = useState<'paste' | 'manual'>('paste');
   const [configPaste, setConfigPaste] = useState('');
-  const [configForm, setConfigForm] = useState({ filePath: '', content: '', note: '' });
+  const [configForm, setConfigForm] = useState({ filePath: '', content: '', language: 'text', note: '' });
 
   // Log form state
   const [showLogForm, setShowLogForm] = useState(false);
@@ -90,17 +91,19 @@ export function IssueDetailPage() {
   };
 
   // Parse config paste content: first line is command (cat /path/to/file), rest is content
-  const parseConfigPaste = (content: string): { filePath: string; content: string } => {
+  const parseConfigPaste = (content: string): { filePath: string; content: string; language: string } => {
     const lines = content.trim().split('\n');
-    if (lines.length === 0) return { filePath: '', content: '' };
+    if (lines.length === 0) return { filePath: '', content: '', language: 'text' };
 
     const firstLine = lines[0];
     // Try to extract file path from command like "root@host:~# cat /path/to/file"
     const catMatch = firstLine.match(/cat\s+([^\s]+)/);
     if (catMatch) {
+      const filePath = catMatch[1];
       return {
-        filePath: catMatch[1],
+        filePath,
         content: lines.slice(1).join('\n'),
+        language: detectLanguageFromPath(filePath),
       };
     }
 
@@ -109,11 +112,12 @@ export function IssueDetailPage() {
       return {
         filePath: firstLine,
         content: lines.slice(1).join('\n'),
+        language: detectLanguageFromPath(firstLine),
       };
     }
 
     // Otherwise, no file path detected
-    return { filePath: '', content: content.trim() };
+    return { filePath: '', content: content.trim(), language: 'text' };
   };
 
   const handleAddConfig = async (e: React.FormEvent) => {
@@ -126,6 +130,7 @@ export function IssueDetailPage() {
       data = {
         filePath: parsed.filePath,
         content: parsed.content,
+        language: parsed.language,
         note: configForm.note,
       };
     }
@@ -139,7 +144,7 @@ export function IssueDetailPage() {
         note: data.note || null,
       });
       setConfigPaste('');
-      setConfigForm({ filePath: '', content: '', note: '' });
+      setConfigForm({ filePath: '', content: '', language: 'text', note: '' });
       setShowConfigForm(false);
       const updated = await configApi.listByIssue(issue.id);
       setConfigs(updated);
@@ -441,13 +446,30 @@ export function IssueDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <input
-                      type="text"
-                      placeholder="文件路径（如 /etc/nginx/nginx.conf）"
-                      value={configForm.filePath}
-                      onChange={(e) => setConfigForm({ ...configForm, filePath: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        type="text"
+                        placeholder="文件路径（如 /etc/nginx/nginx.conf）"
+                        value={configForm.filePath}
+                        onChange={(e) => {
+                          const filePath = e.target.value;
+                          const detectedLang = detectLanguageFromPath(filePath);
+                          setConfigForm({ ...configForm, filePath, language: detectedLang });
+                        }}
+                        className="px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                      />
+                      <select
+                        value={configForm.language}
+                        onChange={(e) => setConfigForm({ ...configForm, language: e.target.value })}
+                        className="px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        {SUPPORTED_LANGUAGES.map((lang) => (
+                          <option key={lang.value} value={lang.value}>
+                            {lang.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <textarea
                       placeholder="配置内容"
                       value={configForm.content}
@@ -486,7 +508,12 @@ export function IssueDetailPage() {
                     className="bg-white rounded-lg border border-gray-200 overflow-hidden"
                   >
                     <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                      <span className="font-mono text-sm text-gray-700">{config.filePath}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-sm text-gray-700">{config.filePath}</span>
+                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
+                          {SUPPORTED_LANGUAGES.find((l) => l.value === config.language)?.label || config.language}
+                        </span>
+                      </div>
                       <button
                         onClick={() => handleDeleteConfig(config.id)}
                         className="text-gray-400 hover:text-red-600"
@@ -496,9 +523,7 @@ export function IssueDetailPage() {
                         </svg>
                       </button>
                     </div>
-                    <pre className="px-4 py-3 text-sm font-mono text-gray-800 overflow-x-auto whitespace-pre-wrap bg-gray-50">
-                      {config.content}
-                    </pre>
+                    <CodeBlock code={config.content} language={config.language} />
                     {config.note && (
                       <div className="px-4 py-2 border-t border-gray-200 bg-amber-50">
                         <span className="text-xs text-amber-600 font-medium">备注: </span>
