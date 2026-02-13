@@ -54,3 +54,48 @@ export function renderColoredOutput(output: string): Array<{ text: string; class
     className: getLineClassName(line),
   }));
 }
+
+type LogType = 'info' | 'warning' | 'error' | 'success';
+
+interface LogColors {
+  bg: string;
+  border: string;
+  header: string;
+  badge: string;
+  text: string;
+}
+
+const LOG_TYPE_COLORS: Record<LogType, LogColors> = {
+  error: {
+    bg: 'bg-red-50',
+    border: 'border-red-200',
+    header: 'bg-red-100',
+    badge: 'bg-red-200 text-red-700',
+    text: 'text-red-700',
+  },
+  warning: {
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    header: 'bg-amber-100',
+    badge: 'bg-amber-200 text-amber-700',
+    text: 'text-amber-700',
+  },
+  success: {
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    header: 'bg-emerald-100',
+    badge: 'bg-emerald-200 text-emerald-700',
+    text: 'text-emerald-700',
+  },
+  info: {
+    bg: 'bg-gray-50',
+    border: 'border-gray-200',
+    header: 'bg-gray-100',
+    badge: 'bg-blue-100 text-blue-700',
+    text: 'text-gray-700',
+  },
+};
+
+export function getLogColors(logType: LogType): LogColors {
+  return LOG_TYPE_COLORS[logType] || LOG_TYPE_COLORS.info;
+}
