@@ -14,8 +14,8 @@ export interface Issue {
 export interface Config {
   id: number;
   issueId: number;
-  key: string;
-  value: string;
+  filePath: string;
+  content: string;
   note: string | null;
   createdAt: string;
 }

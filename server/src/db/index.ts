@@ -43,8 +43,8 @@ export async function initDb(): Promise<Database> {
     CREATE TABLE IF NOT EXISTS configs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       issueId INTEGER NOT NULL,
-      key TEXT NOT NULL,
-      value TEXT DEFAULT '',
+      filePath TEXT NOT NULL,
+      content TEXT DEFAULT '',
       note TEXT,
       createdAt TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (issueId) REFERENCES issues(id) ON DELETE CASCADE

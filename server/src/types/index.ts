@@ -12,8 +12,8 @@ export interface Issue {
 export interface Config {
   id: number;
   issueId: number;
-  key: string;
-  value: string;
+  filePath: string;
+  content: string;
   note?: string;
   createdAt: string;
 }
@@ -25,7 +25,7 @@ export interface ConsoleLog {
   command: string;
   output: string;
   note?: string;
-  logType: 'error' | 'warning' | 'info' | 'clue';
+  logType: 'error' | 'warning' | 'info' | 'success';
   createdAt: string;
 }
 

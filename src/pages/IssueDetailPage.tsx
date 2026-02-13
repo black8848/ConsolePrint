@@ -21,9 +21,15 @@ export function IssueDetailPage() {
   const [activeTab, setActiveTab] = useState<'configs' | 'logs'>('logs');
   const logsContainerRef = useRef<HTMLDivElement>(null);
 
+  // Editable impact
+  const [editingImpact, setEditingImpact] = useState(false);
+  const [impactValue, setImpactValue] = useState('');
+
   // Config form state
   const [showConfigForm, setShowConfigForm] = useState(false);
-  const [configForm, setConfigForm] = useState({ key: '', value: '', note: '' });
+  const [configMode, setConfigMode] = useState<'paste' | 'manual'>('paste');
+  const [configPaste, setConfigPaste] = useState('');
+  const [configForm, setConfigForm] = useState({ filePath: '', content: '', note: '' });
 
   // Log form state
   const [showLogForm, setShowLogForm] = useState(false);
@@ -52,6 +58,7 @@ export function IssueDetailPage() {
         logApi.listByIssue(issueId),
       ]);
       setIssue(issueData);
+      setImpactValue(issueData.impact || '');
       setConfigs(configsData);
       setLogs(logsData);
     } catch (error) {
@@ -71,20 +78,71 @@ export function IssueDetailPage() {
     }
   };
 
+  const handleImpactSave = async () => {
+    if (!issue) return;
+    try {
+      const updated = await issueApi.update(issue.id, { impact: impactValue });
+      setIssue(updated);
+      setEditingImpact(false);
+    } catch (error) {
+      console.error('Failed to update impact:', error);
+    }
+  };
+
+  // Parse config paste content: first line is command (cat /path/to/file), rest is content
+  const parseConfigPaste = (content: string): { filePath: string; content: string } => {
+    const lines = content.trim().split('\n');
+    if (lines.length === 0) return { filePath: '', content: '' };
+
+    const firstLine = lines[0];
+    // Try to extract file path from command like "root@host:~# cat /path/to/file"
+    const catMatch = firstLine.match(/cat\s+([^\s]+)/);
+    if (catMatch) {
+      return {
+        filePath: catMatch[1],
+        content: lines.slice(1).join('\n'),
+      };
+    }
+
+    // If no cat command found, treat first line as file path if it looks like a path
+    if (firstLine.startsWith('/') || firstLine.includes(':\\')) {
+      return {
+        filePath: firstLine,
+        content: lines.slice(1).join('\n'),
+      };
+    }
+
+    // Otherwise, no file path detected
+    return { filePath: '', content: content.trim() };
+  };
+
   const handleAddConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!issue || !configForm.key.trim()) return;
+    if (!issue) return;
+
+    let data = configForm;
+    if (configMode === 'paste' && configPaste.trim()) {
+      const parsed = parseConfigPaste(configPaste);
+      data = {
+        filePath: parsed.filePath,
+        content: parsed.content,
+        note: configForm.note,
+      };
+    }
+
+    if (!data.filePath && !data.content) return;
 
     try {
       await configApi.create({
         issueId: issue.id,
-        ...configForm,
-        note: configForm.note || null,
+        ...data,
+        note: data.note || null,
       });
-      setConfigForm({ key: '', value: '', note: '' });
+      setConfigPaste('');
+      setConfigForm({ filePath: '', content: '', note: '' });
       setShowConfigForm(false);
-      const data = await configApi.listByIssue(issue.id);
-      setConfigs(data);
+      const updated = await configApi.listByIssue(issue.id);
+      setConfigs(updated);
     } catch (error) {
       console.error('Failed to add config:', error);
     }
@@ -225,14 +283,50 @@ export function IssueDetailPage() {
             </Link>
           </div>
           <div className="flex items-start justify-between">
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl font-semibold text-gray-800 mb-2">{issue.title}</h1>
               {issue.description && (
                 <p className="text-gray-600 text-sm mb-2">{issue.description}</p>
               )}
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 {issue.location && <span>位置: {issue.location}</span>}
-                {issue.impact && <span>影响: {issue.impact}</span>}
+                <div className="flex items-center gap-2">
+                  <span>影响:</span>
+                  {editingImpact ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={impactValue}
+                        onChange={(e) => setImpactValue(e.target.value)}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleImpactSave}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        保存
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingImpact(false);
+                          setImpactValue(issue.impact || '');
+                        }}
+                        className="text-gray-500 hover:text-gray-600"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      onClick={() => setEditingImpact(true)}
+                      className="cursor-pointer hover:text-blue-600 hover:underline"
+                      title="点击编辑"
+                    >
+                      {issue.impact || '(点击添加)'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -302,71 +396,117 @@ export function IssueDetailPage() {
 
             {showConfigForm && (
               <form onSubmit={handleAddConfig} className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <input
-                    type="text"
-                    placeholder="配置名称 *"
-                    value={configForm.key}
-                    onChange={(e) => setConfigForm({ ...configForm, key: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                  <input
-                    type="text"
-                    placeholder="配置值"
-                    value={configForm.value}
-                    onChange={(e) => setConfigForm({ ...configForm, value: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg"
-                  />
+                <div className="flex gap-4 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setConfigMode('paste')}
+                    className={`px-3 py-1.5 rounded-lg text-sm ${
+                      configMode === 'paste' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    粘贴解析
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfigMode('manual')}
+                    className={`px-3 py-1.5 rounded-lg text-sm ${
+                      configMode === 'manual' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    手动输入
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  placeholder="备注（可选）"
-                  value={configForm.note}
-                  onChange={(e) => setConfigForm({ ...configForm, note: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  添加
-                </button>
+
+                {configMode === 'paste' ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">
+                        粘贴配置内容（首行为 cat 命令或文件路径，后续为配置内容）
+                      </label>
+                      <textarea
+                        placeholder="root@host:~# cat /path/to/config.json&#10;{&#10;  &quot;key&quot;: &quot;value&quot;&#10;}"
+                        value={configPaste}
+                        onChange={(e) => setConfigPaste(e.target.value)}
+                        rows={10}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="备注（可选）- 你对这个配置的看法"
+                      value={configForm.note}
+                      onChange={(e) => setConfigForm({ ...configForm, note: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      placeholder="文件路径（如 /etc/nginx/nginx.conf）"
+                      value={configForm.filePath}
+                      onChange={(e) => setConfigForm({ ...configForm, filePath: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                    />
+                    <textarea
+                      placeholder="配置内容"
+                      value={configForm.content}
+                      onChange={(e) => setConfigForm({ ...configForm, content: e.target.value })}
+                      rows={10}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="备注（可选）- 你对这个配置的看法"
+                      value={configForm.note}
+                      onChange={(e) => setConfigForm({ ...configForm, note: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    添加
+                  </button>
+                </div>
               </form>
             )}
 
             {configs.length === 0 ? (
               <div className="text-center py-12 text-gray-500">暂无配置</div>
             ) : (
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">配置名称</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">配置值</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">备注</th>
-                      <th className="px-4 py-3 w-16"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {configs.map((config) => (
-                      <tr key={config.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-mono text-gray-800">{config.key}</td>
-                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{config.value}</td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{config.note || '-'}</td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleDeleteConfig(config.id)}
-                            className="text-gray-400 hover:text-red-600"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-4">
+                {configs.map((config) => (
+                  <div
+                    key={config.id}
+                    className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+                  >
+                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                      <span className="font-mono text-sm text-gray-700">{config.filePath}</span>
+                      <button
+                        onClick={() => handleDeleteConfig(config.id)}
+                        className="text-gray-400 hover:text-red-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <pre className="px-4 py-3 text-sm font-mono text-gray-800 overflow-x-auto whitespace-pre-wrap bg-gray-50">
+                      {config.content}
+                    </pre>
+                    {config.note && (
+                      <div className="px-4 py-2 border-t border-gray-200 bg-amber-50">
+                        <span className="text-xs text-amber-600 font-medium">备注: </span>
+                        <span className="text-sm text-amber-800">{config.note}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -419,7 +559,7 @@ export function IssueDetailPage() {
                     />
                     <input
                       type="text"
-                      placeholder="备注（可选）"
+                      placeholder="备注（可选）- 你对这个报错的看法"
                       value={logForm.note}
                       onChange={(e) => setLogForm({ ...logForm, note: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -462,7 +602,7 @@ export function IssueDetailPage() {
                     />
                     <input
                       type="text"
-                      placeholder="备注（可选）"
+                      placeholder="备注（可选）- 你对这个报错的看法"
                       value={logForm.note}
                       onChange={(e) => setLogForm({ ...logForm, note: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -528,13 +668,13 @@ export function IssueDetailPage() {
                             <pre className={`font-mono text-sm whitespace-pre-wrap ${colors.text}`}>{log.output}</pre>
                           </div>
                         )}
-                        {log.note && (
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <div className="text-xs text-gray-500 mb-1">Note</div>
-                            <p className="text-sm text-gray-600">{log.note}</p>
-                          </div>
-                        )}
                       </div>
+                      {log.note && (
+                        <div className="px-4 py-2 border-t border-gray-200 bg-amber-50">
+                          <span className="text-xs text-amber-600 font-medium">备注: </span>
+                          <span className="text-sm text-amber-800">{log.note}</span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
